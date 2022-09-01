@@ -2,4 +2,5 @@
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
 docker build "$SCRIPTPATH" \
-    -t picai_baseline_nnunet_processor
+    -t picai_baseline_nnunet_processor:v1.1 \
+    -t picai_baseline_nnunet_processor:latest

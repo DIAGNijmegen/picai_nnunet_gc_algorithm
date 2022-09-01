@@ -14,17 +14,20 @@
 
 import json
 import os
+import pickle
 import subprocess
 from pathlib import Path
+from typing import Union
 
 import numpy as np
 import SimpleITK as sitk
 from evalutils import SegmentationAlgorithm
 from evalutils.validators import (UniqueImagesValidator,
                                   UniquePathIndicesValidator)
+from picai_baseline.nnunet.softmax_export import \
+    save_softmax_nifti_from_softmax
 from picai_prep.data_utils import atomic_image_write
-from picai_prep.preprocessing import (Sample, crop_or_pad,
-                                      resample_to_reference_scan)
+from picai_prep.preprocessing import Sample, crop_or_pad
 from report_guided_annotation import extract_lesion_candidates
 
 
@@ -42,6 +45,29 @@ class MultipleScansSameSequencesError(Exception):
     def __init__(self, name, folder):
         message = f"Found multiple scans for {name} in {folder} (files: {os.listdir(folder)})"
         super.__init__(message)
+
+
+def convert_to_original_extent(pred: np.ndarray, pkl_path: Union[Path, str], dst_path: Union[Path, str]):
+    # convert to nnUNet's internal softmax format
+    pred = np.array([1-pred, pred])
+
+    # read physical properties of current case
+    with open(pkl_path, "rb") as fp:
+        properties = pickle.load(fp)
+
+    # let nnUNet resample to original physical space
+    save_softmax_nifti_from_softmax(
+        segmentation_softmax=pred,
+        out_fname=str(dst_path),
+        properties_dict=properties,
+    )
+
+
+def extract_lesion_candidates_cropped(pred: np.ndarray, threshold: Union[str, float]):
+    size = pred.shape
+    pred = crop_or_pad(pred, (20, 384, 384))
+    pred = crop_or_pad(pred, size)
+    return extract_lesion_candidates(pred, threshold=threshold)[0]
 
 
 class csPCaAlgorithm(SegmentationAlgorithm):
@@ -145,23 +171,27 @@ class csPCaAlgorithm(SegmentationAlgorithm):
         # average the accumulated confidence scores
         pred_ensemble /= ensemble_count
 
-        # convert softmax prediction to physical space of original T2-weighted scan
-        reference_scan_original_path = str(self.scan_paths[0])
-        reference_scan_original = sitk.ReadImage(reference_scan_original_path)
-        reference_scan_preprocessed = sitk.ReadImage(str(self.nnunet_out_dir / "scan.nii.gz"))
-        pred_ensemble = resample_to_reference_scan(
-            image=crop_or_pad(pred_ensemble, size=list(reference_scan_preprocessed.GetSize())[::-1]),
-            reference_scan_original=reference_scan_original,
-            reference_scan_preprocessed=reference_scan_preprocessed,
+        # the prediction is currently at the size and location of the nnU-Net preprocessed
+        # scan, so we need to convert it to the original extent before we continue
+        convert_to_original_extent(
+            pred=pred_ensemble,
+            pkl_path=self.nnunet_out_dir / "scan.pkl",
+            dst_path=self.nnunet_out_dir / "softmax.nii.gz",
         )
 
+        # now each voxel in softmax.nii.gz corresponds to the same voxel in the original (T2-weighted) scan
+        pred_ensemble = sitk.ReadImage(str(self.nnunet_out_dir / "softmax.nii.gz"))
+
         # extract lesion candidates from softmax prediction
-        detection_map, _, _ = extract_lesion_candidates(
+        # note: we set predictions outside the central 81 x 192 x 192 mm to zero, as this is far outside the prostate
+        detection_map = extract_lesion_candidates_cropped(
             softmax=sitk.GetArrayFromImage(pred_ensemble),
             threshold="dynamic"
         )
 
-        # convert detection map to a SimpleITK image
+        # convert detection map to a SimpleITK image and infuse the physical metadata of original T2-weighted scan
+        reference_scan_original_path = str(self.scan_paths[0])
+        reference_scan_original = sitk.ReadImage(reference_scan_original_path)
         detection_map: sitk.Image = sitk.GetImageFromArray(detection_map)
         detection_map.CopyInformation(reference_scan_original)
 
