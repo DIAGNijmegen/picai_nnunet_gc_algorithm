@@ -185,7 +185,7 @@ class csPCaAlgorithm(SegmentationAlgorithm):
         # extract lesion candidates from softmax prediction
         # note: we set predictions outside the central 81 x 192 x 192 mm to zero, as this is far outside the prostate
         detection_map = extract_lesion_candidates_cropped(
-            softmax=sitk.GetArrayFromImage(pred_ensemble),
+            pred=sitk.GetArrayFromImage(pred_ensemble),
             threshold="dynamic"
         )
 
