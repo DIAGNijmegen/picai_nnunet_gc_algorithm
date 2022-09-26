@@ -11,7 +11,7 @@ docker volume create $DOCKER_FILE_SHARE
 # you can see your output (to debug what's going on) by specifying a path instead:
 # DOCKER_FILE_SHARE="/mnt/netcache/pelvis/projects/joeran/tmp-docker-volume"
 
-docker run --rm \
+docker run --cpus=4 --memory=32gb --shm-size=32gb --gpus='"device=0"' --rm \
         -v $SCRIPTPATH/test/:/input/ \
         -v $DOCKER_FILE_SHARE:/output/ \
         picai_baseline_nnunet_processor
@@ -20,7 +20,7 @@ docker run --rm \
 docker run --rm \
         -v $DOCKER_FILE_SHARE:/output/ \
         -v $SCRIPTPATH/test/:/input/ \
-        insighttoolkit/simpleitk-notebooks:latest python -c "import sys; import json; import numpy as np; import SimpleITK as sitk; f1 = sitk.GetArrayFromImage(sitk.ReadImage('/output/images/cspca-detection-map/cspca_detection_map.mha')); f2 = sitk.GetArrayFromImage(sitk.ReadImage('/input/cspca-detection-map/10032_1000032.mha')); print('max. difference between prediction and reference:', np.abs(f1-f2).max()); sys.exit(int(np.abs(f1-f2).max() > 1e-3));"
+        insighttoolkit/simpleitk-notebooks:latest python -c "import sys; import numpy as np; import SimpleITK as sitk; f1 = sitk.GetArrayFromImage(sitk.ReadImage('/output/images/cspca-detection-map/cspca_detection_map.mha')); f2 = sitk.GetArrayFromImage(sitk.ReadImage('/input/cspca-detection-map/10032_1000032.mha')); print('N/o voxels more than 1e-6 differerent between prediction and reference:', np.sum(np.abs(f1-f2)>1e-6)); sys.exit(int(np.sum(np.abs(f1-f2)>1e-6)) > 10);"
 
 if [ $? -eq 0 ]; then
     echo "Detection map test successfully passed..."
