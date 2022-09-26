@@ -20,7 +20,7 @@ docker run --cpus=4 --memory=32gb --shm-size=32gb --gpus='"device=0"' --rm \
 docker run --rm \
         -v $DOCKER_FILE_SHARE:/output/ \
         -v $SCRIPTPATH/test/:/input/ \
-        insighttoolkit/simpleitk-notebooks:latest python -c "import sys; import numpy as np; import SimpleITK as sitk; f1 = sitk.GetArrayFromImage(sitk.ReadImage('/output/images/cspca-detection-map/cspca_detection_map.mha')); f2 = sitk.GetArrayFromImage(sitk.ReadImage('/input/cspca-detection-map/10032_1000032.mha')); print('N/o voxels more than 1e-6 differerent between prediction and reference:', np.sum(np.abs(f1-f2)>1e-6)); sys.exit(int(np.sum(np.abs(f1-f2)>1e-6)) > 10);"
+        insighttoolkit/simpleitk-notebooks:latest python -c "import sys; import numpy as np; import SimpleITK as sitk; f1 = sitk.GetArrayFromImage(sitk.ReadImage('/output/images/cspca-detection-map/cspca_detection_map.mha')); f2 = sitk.GetArrayFromImage(sitk.ReadImage('/input/cspca-detection-map/10032_1000032.mha')); print('N/o voxels more than 1e-3 differerent between prediction and reference:', np.sum(np.abs(f1-f2)>1e-3)); sys.exit(int(np.sum(np.abs(f1-f2)>1e-3)) > 10);"
 
 if [ $? -eq 0 ]; then
     echo "Detection map test successfully passed..."
