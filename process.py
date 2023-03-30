@@ -24,11 +24,12 @@ import SimpleITK as sitk
 from evalutils import SegmentationAlgorithm
 from evalutils.validators import (UniqueImagesValidator,
                                   UniquePathIndicesValidator)
+from report_guided_annotation import extract_lesion_candidates
+
 from picai_baseline.nnunet.softmax_export import \
     save_softmax_nifti_from_softmax
 from picai_prep.data_utils import atomic_image_write
 from picai_prep.preprocessing import Sample, crop_or_pad
-from report_guided_annotation import extract_lesion_candidates
 
 
 class MissingSequenceError(Exception):
@@ -36,7 +37,7 @@ class MissingSequenceError(Exception):
 
     def __init__(self, name, folder):
         message = f"Could not find scan for {name} in {folder} (files: {os.listdir(folder)})"
-        super.__init__(message)
+        super().__init__(message)
 
 
 class MultipleScansSameSequencesError(Exception):
@@ -44,7 +45,7 @@ class MultipleScansSameSequencesError(Exception):
 
     def __init__(self, name, folder):
         message = f"Found multiple scans for {name} in {folder} (files: {os.listdir(folder)})"
-        super.__init__(message)
+        super().__init__(message)
 
 
 def convert_to_original_extent(pred: np.ndarray, pkl_path: Union[Path, str], dst_path: Union[Path, str]):
